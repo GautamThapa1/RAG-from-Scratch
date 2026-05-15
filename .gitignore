@@ -1,0 +1,51 @@
+# 1. Create .gitignore first (IMPORTANT!)
+cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.venv/
+rag-app/  # Your virtual environment
+
+# Environment variables
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+temp/
+*.pdf
+*.txt
+
+# Embeddings cache
+embeddings_cache/
+.embeddings_cache
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+EOF
+
