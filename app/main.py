@@ -68,6 +68,7 @@ async def ask(request: AskRequest):
             "content":          c["content"][:300],
             "similarity_score": round(c["similarity_score"], 3),
             "document_id":      c["document_id"],
+            "page_number":      c["page_number"],
         }
         for c in chunks
         if c["similarity_score"] > 0.3
@@ -116,3 +117,9 @@ async def health():
         }
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
+    
+
+@app.delete("/documents")
+async def remove_all_documents():
+    doc_mgr.delete_all()
+    return {"message": "All documents and embeddings deleted"}

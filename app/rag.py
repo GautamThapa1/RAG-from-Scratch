@@ -27,28 +27,30 @@ class Ingester:
         print(f"Extracting & chunking '{filename}'...")
         chunks = self.processor.process(file_path)
         print(f"  {len(chunks)} chunks — generating embeddings...")
-        embeddings = self.embedder.generate_batch(chunks)
+
+        # Extract just the text for embedding
+        chunk_texts = [c["content"] for c in chunks]
+        embeddings = self.embedder.generate_batch(chunk_texts)
 
         with db.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
                 """INSERT INTO documents (filename, title, total_chunks)
-                   VALUES (%s, %s, %s) RETURNING id""",
+                VALUES (%s, %s, %s) RETURNING id""",
                 (filename, filename, len(chunks)),
             )
             doc_id = cur.fetchone()[0]
 
-            for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+            for i, chunk in enumerate(chunks):
                 cur.execute(
                     """INSERT INTO document_chunks
-                         (document_id, chunk_index, content, embedding)
-                       VALUES (%s, %s, %s, %s::vector)""",
-                    (doc_id, i, chunk, _vec_str(emb)),
+                        (document_id, chunk_index, content, embedding, page_number)
+                    VALUES (%s, %s, %s, %s::vector, %s)""",
+                    (doc_id, i, chunk["content"], _vec_str(embeddings[i]), chunk["page_number"]),
                 )
 
         print(f"✅ Ingested '{filename}' — doc_id={doc_id}, {len(chunks)} chunks")
         return doc_id, len(chunks)
-
 
 # ── Retriever ─────────────────────────────────────────────────────────────────
 
@@ -64,12 +66,12 @@ class Retriever:
         with db.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                """SELECT dc.content, dc.document_id, dc.chunk_index,
+                """SELECT dc.content, dc.document_id, dc.chunk_index, dc.page_number,
                           dc.embedding <=> %s::vector AS distance
                    FROM document_chunks dc
                    ORDER BY distance
                    LIMIT %s""",
-                (emb_str, k),          # ← fix: was passing `top_k` (None) instead of `k`
+                (emb_str, k),
             )
             rows = cur.fetchall()
 
@@ -78,7 +80,8 @@ class Retriever:
                 "content":          row[0],
                 "document_id":      row[1],
                 "chunk_index":      row[2],
-                "similarity_score": 1 - row[3],
+                "page_number":      row[3],
+                "similarity_score": 1 - row[4],
             }
             for row in rows
         ]

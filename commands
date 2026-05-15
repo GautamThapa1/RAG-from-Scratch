@@ -1,11 +1,7 @@
-SELECT
-	TABLENAME
-FROM
-	PG_TABLES
-WHERE
-	SCHEMANAME = 'public';
+ALTER TABLE document_chunks
+ADD COLUMN PAGE_NUMBER INTEGER;
 
-SELECT
-	*
-FROM
-	DOCUMENT_CHUNKS;
+select * from document_chunks;
+
+SELECT document_id, chunk_index, page_number, content, embedding 
+FROM document_chunks;

@@ -18,33 +18,19 @@ class PDFProcessor:
         self.chunk_size = chunk_size
         self.overlap = overlap
 
-    # ── Text extraction ──────────────────────────────────────────────────────
 
-    def extract_text(self, file_path: str) -> str:
-        try:
-            with fitz.open(file_path) as doc:
-                return "\n".join(page.get_text() for page in doc)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"PDF not found: {file_path}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to extract text: {e}") from e
+    # ── text extracting, chunking with page no ────────────────────────────────────────────────────
 
-    # ── Chunking ─────────────────────────────────────────────────────────────
-
-    def chunk_text(self, text: str) -> list[str]:
-        if not text.strip():
-            return []
-        step = self.chunk_size - self.overlap
+    def process(self, file_path: str) -> list[dict]:
+        """Return list [chunks, page_number]."""
         chunks = []
-        for start in range(0, len(text), step):
-            chunk = text[start : start + self.chunk_size]
-            if chunk.strip():
-                chunks.append(chunk)
+        step = self.chunk_size - self.overlap
+        with fitz.open(file_path) as doc:
+            for page_num, page in enumerate(doc, start=1):
+                text = page.get_text()
+                for start in range(0, len(text), step):
+                    chunk_text = text[start: start + self.chunk_size].strip()
+                    if chunk_text:
+                        chunks.append({"content": chunk_text, "page_number": page_num})
         return chunks
-
-    # ── Combined pipeline ────────────────────────────────────────────────────
-
-    def process(self, file_path: str) -> list[str]:
-        """Extract text from PDF and return chunks."""
-        text = self.extract_text(file_path)
-        return self.chunk_text(text)
+        
