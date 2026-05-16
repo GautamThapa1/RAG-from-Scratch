@@ -20,7 +20,8 @@ class Config:
     OLLAMA_URL   = "http://localhost:11434"
 
     # Retrieval
-    TOP_K = 5
+    TOP_K = 50
+    RRF_K = 60
 
 
 config = Config()

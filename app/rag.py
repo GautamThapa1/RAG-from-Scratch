@@ -54,36 +54,89 @@ class Ingester:
 
 # ── Retriever ─────────────────────────────────────────────────────────────────
 
-class Retriever:
-    def __init__(self, embedder: Embedder, top_k: int = config.TOP_K):
+class HybridSearch:
+    def __init__(self, query:str, embedder: Embedder, k=config.TOP_K):
+        self.query = query
         self.embedder = embedder
-        self.top_k = top_k
+        self.k = k
+    
+    def semantic_search(self) -> list[tuple]:
 
-    def search(self, query: str, top_k: int | None = None) -> list[dict]:
-        k = top_k or self.top_k
-        emb_str = _vec_str(self.embedder.generate(query))
+        embedded_query = _vec_str(self.embedder.generate(self.query))
 
         with db.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                """SELECT dc.content, dc.document_id, dc.chunk_index, dc.page_number,
-                          dc.embedding <=> %s::vector AS distance
-                   FROM document_chunks dc
-                   ORDER BY distance
-                   LIMIT %s""",
-                (emb_str, k),
+                """
+                SELECT content,
+                    document_id,
+                    chunk_index,
+                    page_number,
+                    1 - (embedding <=> %s::vector) AS similarity
+                FROM document_chunks
+                ORDER by similarity DESC
+                LIMIT %s""",
+                (embedded_query, self.k),
             )
             rows = cur.fetchall()
+            return rows
+    
+    def keyword_search(self):
 
-        return [
+        with db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT 
+                    content,
+                    document_id,
+                    chunk_index,
+                    page_number,
+                    ts_rank(content_tsv, plainto_tsquery('english', %s)) AS text_score
+                FROM document_chunks
+                WHERE 
+                    content_tsv @@ plainto_tsquery('english', %s)
+                ORDER by text_score DESC
+                LIMIT %s""",
+                (self.query, self.query, self.k),
+            )
+            rows = cur.fetchall()
+            return rows
+    
+    def rrf_fusion(self)->list[dict]:
+
+        semantic = self.semantic_search()
+        keyword = self.keyword_search()
+
+        scores = {}
+        k_rrf = config.RRF_K
+
+        # for semantic search
+        for rank, row in enumerate(semantic,start=1):
+            key = (row[1], row[2])
+            scores[key] = scores.get(key, 0) + 1 / (k_rrf + rank)
+            # scores.get(key, 0) checks if we seen already, core of RRF fusion
+        
+        # for keyword search
+        for rank, row in enumerate(keyword, start=1):
+            key = (row[1], row[2])
+            scores[key] = scores.get(key, 0) + 1 / (k_rrf + rank)
+        
+        best = sorted(scores, key=scores.get, reverse=True)[:self.k]
+        
+        # this is a lookup table, returns all values and match with document_id
+        # and chunk_index
+        lookup = {(r[1], r[2]): r for r in semantic + keyword}
+
+        return[
             {
-                "content":          row[0],
-                "document_id":      row[1],
-                "chunk_index":      row[2],
-                "page_number":      row[3],
-                "similarity_score": 1 - row[4],
+                "content":          lookup[k][0],
+                "document_id":      lookup[k][1],
+                "chunk_index":      lookup[k][2],
+                "page_number":      lookup[k][3],
+                "similarity_score": round(scores[k], 3),
             }
-            for row in rows
+            for k in best
         ]
 
 

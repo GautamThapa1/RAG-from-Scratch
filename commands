@@ -1,7 +1,4 @@
-ALTER TABLE document_chunks
-ADD COLUMN PAGE_NUMBER INTEGER;
-
 select * from document_chunks;
 
-SELECT document_id, chunk_index, page_number, content, embedding 
+SELECT content_tsv, document_id, chunk_index, page_number, content, embedding 
 FROM document_chunks;

@@ -10,7 +10,7 @@ class Embedder:
 
     def __init__(self, model_name: str = config.EMBEDDING_MODEL):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name, device=self.device)
         print(f"Embedder loaded on: {self.model.device}")
 
     def generate(self, text: str) -> list[float]:

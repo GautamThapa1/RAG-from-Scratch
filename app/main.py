@@ -13,13 +13,12 @@ from app.database import db
 from app.embedder import Embedder
 from app.llm import LLMClient
 from app.processor import PDFProcessor
-from app.rag import DocumentManager, Ingester, Retriever
+from app.rag import DocumentManager, Ingester, HybridSearch
 
 # ── Singletons (loaded once at startup) ──────────────────────────────────────
 _embedder  = Embedder()
 _processor = PDFProcessor()
 ingester   = Ingester(_processor, _embedder)
-retriever  = Retriever(_embedder)
 doc_mgr    = DocumentManager()
 llm        = LLMClient()
 
@@ -60,7 +59,8 @@ async def upload_pdf(file: UploadFile = File(...)):
 @app.post("/ask", response_model=AskResponse)
 async def ask(request: AskRequest):
     start  = time.time()
-    chunks = retriever.search(request.question, top_k=request.top_k)
+    searcher = HybridSearch(request.question, _embedder, request.top_k)
+    chunks = searcher.rrf_fusion()
     answer = llm.generate(request.question, chunks)
 
     sources = [
@@ -71,7 +71,6 @@ async def ask(request: AskRequest):
             "page_number":      c["page_number"],
         }
         for c in chunks
-        if c["similarity_score"] > 0.3
     ]
 
     return AskResponse(
