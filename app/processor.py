@@ -1,4 +1,4 @@
-"""Handles PDF text extraction and text chunking."""
+"""PDF text extraction and character-based chunking (word-boundary safe)."""
 
 import fitz  # PyMuPDF
 
@@ -11,26 +11,58 @@ class PDFProcessor:
     def __init__(
         self,
         chunk_size: int = config.CHUNK_SIZE,
-        overlap: int = config.CHUNK_OVERLAP,
+        overlap:    int = config.CHUNK_OVERLAP,
     ):
         if overlap >= chunk_size:
             raise ValueError("chunk_size must be greater than overlap")
         self.chunk_size = chunk_size
-        self.overlap = overlap
+        self.overlap    = overlap
 
+    # ── Internal helpers ──────────────────────────────────────────────────────
 
-    # ── text extracting, chunking with page no ────────────────────────────────────────────────────
+    def _chunk_text(self, text: str) -> list[str]:
+        """
+        Slide a window of `chunk_size` chars across *text*, snapping BOTH
+        edges to word boundaries so chunks never start or end mid-word.
+
+        The key fix: next `start` is derived from the actual snapped `end`
+        minus the overlap — not from the original unsnapped step — so drift
+        never accumulates across chunks.
+        """
+        chunks = []
+        start  = 0
+
+        while start < len(text):
+            end = start + self.chunk_size
+
+            if end < len(text):
+                # Snap right edge back to the nearest space
+                snap = text.rfind(" ", start, end)
+                if snap > start:
+                    end = snap
+
+            chunk = text[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+
+            # Next chunk begins (end - overlap) chars in, snapped forward to a
+            # word boundary so the LEFT edge is also always clean.
+            next_start = end - self.overlap
+            snap_fwd   = text.find(" ", next_start)
+            start      = (snap_fwd + 1) if 0 < snap_fwd < end else next_start
+
+        return chunks
+
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def process(self, file_path: str) -> list[dict]:
-        """Return list [chunks, page_number]."""
-        chunks = []
-        step = self.chunk_size - self.overlap
+        """Return list of {'content': str, 'page_number': int}."""
+        results = []
         with fitz.open(file_path) as doc:
             for page_num, page in enumerate(doc, start=1):
-                text = page.get_text()
-                for start in range(0, len(text), step):
-                    chunk_text = text[start: start + self.chunk_size].strip()
-                    if chunk_text:
-                        chunks.append({"content": chunk_text, "page_number": page_num})
-        return chunks
-        
+                text = page.get_text().strip()
+                if not text:
+                    continue
+                for chunk in self._chunk_text(text):
+                    results.append({"content": chunk, "page_number": page_num})
+        return results

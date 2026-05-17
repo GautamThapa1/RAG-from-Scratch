@@ -1,49 +1,48 @@
-"""Ollama/Mistral client for answer generation."""
+"""Llama.cpp client for answer generation."""
 
-import requests
+from llama_cpp import Llama
 
 from app.config import config
 
+_SYSTEM = "You are a strict RAG assistant. Answer only from the provided context."
 
-class LLMClient:
-    def __init__(self, model: str = config.OLLAMA_MODEL, url: str = config.OLLAMA_URL):
-        self.model = model
-        self.url   = url
-
-    def generate(self, question: str, context_chunks: list[dict]) -> str:
-        if not context_chunks:
-            return "No relevant context found to answer the question."
-
-        context = "\n\n---\n".join(
-            f"Source {i + 1}:\n{chunk['content']}"
-            for i, chunk in enumerate(context_chunks)
-        )
-
-        prompt = f"""You are a helpful assistant. Answer the question based ONLY on the provided context.
+_PROMPT = """\
+Use ONLY the context below to answer the question.
 
 Context:
 {context}
 
 Question: {question}
 
-Instructions:
-- If the context contains the answer, provide a clear, concise answer.
-- If the context does NOT contain the answer, say "I cannot find this information in the provided documents."
-- Do not make up information.
+Rules:
+- If the question asks what the document is about, summarise from the chunks.
+- If you cannot find the answer in the context, say so — do not invent information.
 
 Answer:"""
 
-        resp = requests.post(
-            f"{self.url}/api/generate",
-            json={
-                "model":   self.model,
-                "prompt":  prompt,
-                "stream":  False,
-                "options": {"temperature": 0.3},
-            },
-            timeout=60,
+
+class LLMClient:
+    def __init__(self):
+        self.llm = Llama(
+            model_path=str(config.LLAMA_MODEL),
+            n_ctx=config.LLM_CTX,
+            n_gpu_layers=-1,  # offload everything to GPU
+            verbose=False,
         )
 
-        if resp.status_code == 200:
-            return resp.json().get("response", "No response generated.")
-        return f"Error calling Ollama: {resp.status_code}"
+    def generate(self, question: str, chunks: list[dict]) -> str:
+        if not chunks:
+            return "No relevant context found to answer the question."
+
+        context = "\n\n---\n".join(
+            f"[{i + 1}] {c['content']}" for i, c in enumerate(chunks)
+        )
+
+        response = self.llm.create_chat_completion(
+            messages=[
+                {"role": "system", "content": _SYSTEM},
+                {"role": "user",   "content": _PROMPT.format(context=context, question=question)},
+            ],
+            temperature=config.LLM_TEMP,
+        )
+        return response["choices"][0]["message"]["content"]

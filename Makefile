@@ -9,5 +9,6 @@ sync:  ## Install / update dependencies
 dev:   ## Start server with hot-reload
 	uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
-add:   ## Add a dependency (usage: make add pkg=pandas)
-	uv add $(pkg)
+add:
+	## Add dependencies (usage: make add pandas torch)
+	uv add $(wordlist 2, $(words $(MAKECMDGOALS)), $(MAKECMDGOALS))

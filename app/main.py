@@ -13,14 +13,14 @@ from app.database import db
 from app.embedder import Embedder
 from app.llm import LLMClient
 from app.processor import PDFProcessor
-from app.rag import DocumentManager, Ingester, HybridSearch
+from app.rag import DocumentManager, HybridSearch, Ingester
 
-# ── Singletons (loaded once at startup) ──────────────────────────────────────
+# ── Singletons ────────────────────────────────────────────────────────────────
 _embedder  = Embedder()
 _processor = PDFProcessor()
-ingester   = Ingester(_processor, _embedder)
-doc_mgr    = DocumentManager()
-llm        = LLMClient()
+_ingester  = Ingester(_processor, _embedder)
+_doc_mgr   = DocumentManager()
+_llm       = LLMClient()
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="RAG for college PDFs")
@@ -31,7 +31,8 @@ os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 
 class AskRequest(BaseModel):
     question: str
-    top_k: Optional[int] = config.TOP_K
+    top_k:    Optional[int] = config.TOP_K   # candidate pool per search leg
+    top_n:    Optional[int] = config.TOP_N   # final chunks sent to the LLM
 
 
 class AskResponse(BaseModel):
@@ -52,32 +53,32 @@ async def upload_pdf(file: UploadFile = File(...)):
     with open(file_path, "wb") as buf:
         shutil.copyfileobj(file.file, buf)
 
-    doc_id, num_chunks = ingester.ingest(file_path, file.filename)
+    doc_id, num_chunks = _ingester.ingest(file_path, file.filename)
     return {"document_id": doc_id, "chunks": num_chunks, "filename": file.filename}
 
 
 @app.post("/ask", response_model=AskResponse)
-async def ask(request: AskRequest):
+async def ask(req: AskRequest):
     start  = time.time()
-    searcher = HybridSearch(request.question, _embedder, request.top_k)
-    chunks = searcher.rrf_fusion()
-    answer = llm.generate(request.question, chunks)
+    chunks = HybridSearch(req.question, _embedder, req.top_k).search(req.top_n)
+    answer = _llm.generate(req.question, chunks)
 
     sources = [
         {
-            "content":          c["content"][:300],
-            "similarity_score": round(c["similarity_score"], 3),
-            "document_id":      c["document_id"],
-            "page_number":      c["page_number"],
+            "content":      c["content"][:300],
+            "document_id":  c["document_id"],
+            "page_number":  c["page_number"],
+            # rerank_score present when re-ranker is active (0-1), else rrf_score
+            "score":        c.get("rerank_score", c.get("similarity_score")),
         }
         for c in chunks
     ]
 
     return AskResponse(
-        question=request.question,
+        question=req.question,
         answer=answer,
         sources=sources,
-        processing_time_ms=(time.time() - start) * 1000,
+        processing_time_ms=round((time.time() - start) * 1000, 1),
     )
 
 
@@ -85,20 +86,26 @@ async def ask(request: AskRequest):
 async def get_documents():
     return [
         {"id": d[0], "filename": d[1], "chunks": d[2], "created_at": d[3]}
-        for d in doc_mgr.list()
+        for d in _doc_mgr.list()
     ]
 
 
 @app.delete("/documents/{document_id}")
 async def remove_document(document_id: int):
     try:
-        if not doc_mgr.delete(document_id):
+        if not _doc_mgr.delete(document_id):
             raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
         return {"message": f"Document {document_id} deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting document: {e}")
+
+
+@app.delete("/documents")
+async def remove_all_documents():
+    _doc_mgr.delete_all()
+    return {"message": "All documents and embeddings deleted"}
 
 
 @app.get("/health")
@@ -112,13 +119,8 @@ async def health():
             "status":         "healthy",
             "document_count": doc_count,
             "upload_dir":     config.UPLOAD_DIR,
-            "ollama_model":   config.OLLAMA_MODEL,
+            "llama_model":    str(config.LLAMA_MODEL),
+            "reranker":       str(config.RERANKER_MODEL),
         }
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
-    
-
-@app.delete("/documents")
-async def remove_all_documents():
-    doc_mgr.delete_all()
-    return {"message": "All documents and embeddings deleted"}
