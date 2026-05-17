@@ -1,12 +1,10 @@
-"""Llama.cpp client for answer generation."""
-
 from llama_cpp import Llama
 
 from app.config import config
 
-_SYSTEM = "You are a strict RAG assistant. Answer only from the provided context."
+SYSTEM_PROMPT = "You are a strict RAG assistant. Answer only from the provided context."
 
-_PROMPT = """\
+USER_PROMPT = """\
 Use ONLY the context below to answer the question.
 
 Context:
@@ -14,9 +12,8 @@ Context:
 
 Question: {question}
 
-Rules:
 - If the question asks what the document is about, summarise from the chunks.
-- If you cannot find the answer in the context, say so — do not invent information.
+- If you cannot find the answer, say so. Do not make things up.
 
 Answer:"""
 
@@ -26,7 +23,7 @@ class LLMClient:
         self.llm = Llama(
             model_path=str(config.LLAMA_MODEL),
             n_ctx=config.LLM_CTX,
-            n_gpu_layers=-1,  # offload everything to GPU
+            n_gpu_layers=-1,
             verbose=False,
         )
 
@@ -35,13 +32,13 @@ class LLMClient:
             return "No relevant context found to answer the question."
 
         context = "\n\n---\n".join(
-            f"[{i + 1}] {c['content']}" for i, c in enumerate(chunks)
+            f"[{i+1}] {c['content']}" for i, c in enumerate(chunks)
         )
 
         response = self.llm.create_chat_completion(
             messages=[
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user",   "content": _PROMPT.format(context=context, question=question)},
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": USER_PROMPT.format(context=context, question=question)},
             ],
             temperature=config.LLM_TEMP,
         )

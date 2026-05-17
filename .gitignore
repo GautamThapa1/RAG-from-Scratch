@@ -1,128 +1,27 @@
-# ─── Python & build artifacts ──────────────────────────────────
+# python
 __pycache__/
-*.py[cod]
-*.so
-.Python
-*.egg-info/
-*.egg
-dist/
-build/
-develop-eggs/
-downloads/
-eggs/
-parts/
-var/
-*.pdb
-*.coverage
-.coverage.*
-htmlcov/
-
-# ─── Virtual environments ──────────────────────────────────────
+*.pyc
+*.pyo
 .venv/
-venv/
-ENV/
-env/
-.env
-.venv.bak/
-venv.bak/
+
+# uv
+.uv/
 uv.lock
-uv.toml
 
-# ─── Jupyter notebooks (if used) ───────────────────────────────
-.ipynb_checkpoints/
-*.ipynb
-
-# ─── Uploads / user-generated files ────────────────────────────
+# uploads & models (too large for git)
 uploads/
-*.pdf
-*.docx
-*.txt
-*.png
-*.jpg
-*.jpeg
-!uploads/.gitkeep   # optional, keeps the folder structure
-
-# ─── Large model files (LLM, embeddings, etc.) ─────────────────
 models/
-*.gguf
-*.bin
-*.pt
-*.pth
-*.onnx
-*.h5
-*.keras
-*.pb
-*.tflite
 
-# ─── Secrets & local config ────────────────────────────────────
+# huggingface cache if you set HF_HOME locally
+.hf_cache/
+
+# env
 .env
-.env.local
-.env.*.local
-config_local.py
-secrets.py
-*.pem
-*.key
-*.crt
-*.p12
-*.jks
-*.kdbx
 
-# ─── Logs & temporary files ────────────────────────────────────
-logs/
-*.log
-*.tmp
-*.temp
-*.swp
-*.swo
-*~
-.directory
-*.cache
-
-# ─── Database files (local PostgreSQL / pgvector) ──────────────
-*.db
-*.sqlite
-*.sqlite3
-pgdata/
-*.pid
-postgresql.conf
-pg_hba.conf
-
-# ─── IDE / Editor specific ─────────────────────────────────────
+# ide
 .vscode/
 .idea/
-*.sublime-*
-.project
-.classpath
-.settings/
-*.code-workspace
 
-# ─── OS generated junk ─────────────────────────────────────────
+# os
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
 Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
-# ─── Testing & coverage ────────────────────────────────────────
-.pytest_cache/
-.tox/
-.mypy_cache/
-.ruff_cache/
-.mypy_cache/
-htmlcov/
-.coverage
-
-# ─── Docker / containers (optional) ────────────────────────────
-*.dockerignore
-.docker/
-docker-compose.override.yml
-*.tar.gz
-*.tar
-
-# ─── CI/CD (if not wanting to commit pipeline scripts) ─────────
-.gitlab-ci.yml.local
-.github/workflows/local/
