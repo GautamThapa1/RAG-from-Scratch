@@ -1,51 +1,128 @@
-# 1. Create .gitignore first (IMPORTANT!)
-cat > .gitignore << 'EOF'
-# Python
+# ─── Python & build artifacts ──────────────────────────────────
 __pycache__/
 *.py[cod]
 *.so
 .Python
-env/
-venv/
-.venv/
-rag-app/  # Your virtual environment
+*.egg-info/
+*.egg
+dist/
+build/
+develop-eggs/
+downloads/
+eggs/
+parts/
+var/
+*.pdb
+*.coverage
+.coverage.*
+htmlcov/
 
-# Environment variables
+# ─── Virtual environments ──────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+.env
+.venv.bak/
+venv.bak/
+uv.lock
+uv.toml
+
+# ─── Jupyter notebooks (if used) ───────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── Uploads / user-generated files ────────────────────────────
+uploads/
+*.pdf
+*.docx
+*.txt
+*.png
+*.jpg
+*.jpeg
+!uploads/.gitkeep   # optional, keeps the folder structure
+
+# ─── Large model files (LLM, embeddings, etc.) ─────────────────
+models/
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+*.h5
+*.keras
+*.pb
+*.tflite
+
+# ─── Secrets & local config ────────────────────────────────────
 .env
 .env.local
+.env.*.local
+config_local.py
+secrets.py
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.kdbx
 
-# Database
+# ─── Logs & temporary files ────────────────────────────────────
+logs/
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.directory
+*.cache
+
+# ─── Database files (local PostgreSQL / pgvector) ──────────────
 *.db
 *.sqlite
 *.sqlite3
+pgdata/
+*.pid
+postgresql.conf
+pg_hba.conf
 
-# IDE
+# ─── IDE / Editor specific ─────────────────────────────────────
 .vscode/
 .idea/
-*.swp
-*.swo
+*.sublime-*
+.project
+.classpath
+.settings/
+*.code-workspace
 
-# Logs
-*.log
-logs/
-
-# OS
+# ─── OS generated junk ─────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
-# Uploads
-uploads/
-temp/
-*.pdf
-*.txt
-
-# Embeddings cache
-embeddings_cache/
-.embeddings_cache
-
-# Testing
+# ─── Testing & coverage ────────────────────────────────────────
 .pytest_cache/
-.coverage
+.tox/
+.mypy_cache/
+.ruff_cache/
+.mypy_cache/
 htmlcov/
-EOF
+.coverage
 
+# ─── Docker / containers (optional) ────────────────────────────
+*.dockerignore
+.docker/
+docker-compose.override.yml
+*.tar.gz
+*.tar
+
+# ─── CI/CD (if not wanting to commit pipeline scripts) ─────────
+.gitlab-ci.yml.local
+.github/workflows/local/
