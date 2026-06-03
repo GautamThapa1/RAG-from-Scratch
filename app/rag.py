@@ -9,7 +9,7 @@ from app.processor import PDFProcessor
 def vec_str(vec: list[float]) -> str:
     return "[" + ",".join(map(str, vec)) + "]"
 
-
+#just loading the re-ranker from config
 def load_reranker():
     if not config.RERANKER_MODEL:
         return None
@@ -94,6 +94,30 @@ class HybridSearch:
             )
             return cur.fetchall()
 
+# sample output for RRF
+# [
+#     {
+#         "content": "The quick brown fox jumps over the lazy dog.",
+#         "document_id": 1,
+#         "chunk_index": 0,
+#         "page_number": 2,
+#         "rrf_score": 0.0325
+#     },
+#     {
+#         "content": "RAG combines retrieval and generation.",
+#         "document_id": 3,
+#         "chunk_index": 1,
+#         "page_number": 3,
+#         "rrf_score": 0.0323
+#     },
+#     {
+#         "content": "Machine learning is a subset of AI.",
+#         "document_id": 2,
+#         "chunk_index": 3,
+#         "page_number": 1,
+#         "rrf_score": 0.0161
+#     }
+# ]
     def rrf_fuse(self, semantic: list[tuple], keyword: list[tuple]) -> list[dict]:
         scores = {}
         rows   = {}
@@ -122,14 +146,16 @@ class HybridSearch:
         ]
 
     def rerank(self, candidates: list[dict]) -> list[dict]:
+        # reranker instance is at the top as global
         if reranker is None or not candidates:
             return candidates
 
         pairs  = [(self.query, c["content"]) for c in candidates]
-        logits = reranker.predict(pairs)
+        logits = reranker.predict(pairs) # Output: [-2.1, 3.4, -4.2, 2.8]
 
         for chunk, logit in zip(candidates, logits):
             # sigmoid turns raw logits into a 0-1 score that's easy to read
+            # σ(x) = 1 / (1 + e^(-x))
             chunk["rerank_score"] = round(1.0 / (1.0 + math.exp(-float(logit))), 4)
 
         return sorted(candidates, key=lambda c: c["rerank_score"], reverse=True)

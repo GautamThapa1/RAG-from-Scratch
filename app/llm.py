@@ -2,21 +2,17 @@ from llama_cpp import Llama
 
 from app.config import config
 
-SYSTEM_PROMPT = "You are a strict RAG assistant. Answer only from the provided context."
+SYSTEM_PROMPT = "You are a helpful assistant. Answer questions using the provided context."
 
 USER_PROMPT = """\
-Use ONLY the context below to answer the question.
+Use the context below to answer the question. The answer is in the context, read it carefully.
 
 Context:
 {context}
 
 Question: {question}
 
-- If the question asks what the document is about, summarise from the chunks.
-- If you cannot find the answer, say so. Do not make things up.
-
 Answer:"""
-
 
 class LLMClient:
     def __init__(self):

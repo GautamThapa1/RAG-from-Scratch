@@ -1,6 +1,7 @@
 import os
 import shutil
 import time
+import asyncio
 from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -37,7 +38,7 @@ class AskResponse(BaseModel):
 
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
@@ -48,12 +49,11 @@ async def upload_pdf(file: UploadFile = File(...)):
     doc_id, num_chunks = ingester.ingest(file_path, file.filename)
     return {"document_id": doc_id, "chunks": num_chunks, "filename": file.filename}
 
-
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest):
     start  = time.time()
-    chunks = HybridSearch(req.question, embedder, req.top_k).search(req.top_n)
-    answer = llm.generate(req.question, chunks)
+    chunks = await asyncio.to_thread(HybridSearch(req.question, embedder, req.top_k).search, req.top_n)
+    answer = await asyncio.to_thread(llm.generate, req.question, chunks)
 
     sources = [
         {
@@ -74,7 +74,7 @@ async def ask(req: AskRequest):
 
 
 @app.get("/documents")
-async def get_documents():
+def get_documents():
     return [
         {"id": d[0], "filename": d[1], "chunks": d[2], "created_at": d[3]}
         for d in doc_mgr.list()
@@ -82,20 +82,20 @@ async def get_documents():
 
 
 @app.delete("/documents/{doc_id}")
-async def delete_document(doc_id: int):
+def delete_document(doc_id: int):
     if not doc_mgr.delete(doc_id):
         raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
     return {"message": f"Document {doc_id} deleted"}
 
 
 @app.delete("/documents")
-async def delete_all_documents():
+def delete_all_documents():
     doc_mgr.delete_all()
     return {"message": "All documents deleted"}
 
 
 @app.get("/health")
-async def health():
+def health():
     try:
         with db.get_connection() as conn:
             cur = conn.cursor()
