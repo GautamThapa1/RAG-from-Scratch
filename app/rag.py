@@ -22,7 +22,6 @@ def load_reranker():
         print(f"Re-ranker unavailable: {e}")
         return None
 
-
 reranker = load_reranker()
 
 
@@ -71,7 +70,7 @@ class HybridSearch:
                 SELECT content, document_id, chunk_index, page_number,
                        1 - (embedding <=> %s::vector) AS score
                 FROM document_chunks
-                ORDER BY score DESC
+                ORDER BY score ASC
                 LIMIT %s
                 """,
                 (vec, self.top_k),
@@ -120,31 +119,33 @@ class HybridSearch:
 # ]
     def rrf_fuse(self, semantic: list[tuple], keyword: list[tuple]) -> list[dict]:
         scores = {}
-        rows   = {}
+        rows = {}
 
-        for rank, row in enumerate(semantic, start=1):
-            key = (row[1], row[2])
-            scores[key] = scores.get(key, 0.0) + 1.0 / (config.RRF_K + rank)
-            rows.setdefault(key, row)
+        def update_scores(results):
+            for rank, row in enumerate(results, start=1):
+                key = (row[1], row[2])
 
-        for rank, row in enumerate(keyword, start=1):
-            key = (row[1], row[2])
-            scores[key] = scores.get(key, 0.0) + 1.0 / (config.RRF_K + rank)
-            rows.setdefault(key, row)
+                scores[key] = scores.get(key, 0) + 1 / (config.RRF_K + rank)
 
-        sorted_keys = sorted(scores, key=scores.__getitem__, reverse=True)[: self.top_k]
+                if key not in rows:
+                    rows[key] = row
+
+        update_scores(semantic)
+        update_scores(keyword)
+
+        top_keys = sorted(scores, key=scores.get, reverse=True)[:self.top_k]
 
         return [
             {
-                "content":     rows[k][0],
-                "document_id": rows[k][1],
-                "chunk_index": rows[k][2],
-                "page_number": rows[k][3],
-                "rrf_score":   round(scores[k], 4),
+                "content": rows[key][0],
+                "document_id": rows[key][1],
+                "chunk_index": rows[key][2],
+                "page_number": rows[key][3],
+                "rrf_score": round(scores[key], 4),
             }
-            for k in sorted_keys
+            for key in top_keys
         ]
-
+    
     def rerank(self, candidates: list[dict]) -> list[dict]:
         # reranker instance is at the top as global
         if reranker is None or not candidates:

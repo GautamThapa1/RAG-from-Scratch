@@ -14,6 +14,8 @@ from app.llm import LLMClient
 from app.processor import PDFProcessor
 from app.rag import DocumentManager, HybridSearch, Ingester
 
+from fastapi.middleware.cors import CORSMiddleware
+
 embedder  = Embedder()
 processor = PDFProcessor()
 ingester  = Ingester(processor, embedder)
@@ -22,6 +24,17 @@ llm       = LLMClient()
 
 app = FastAPI(title="RAG API")
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
+
+app = FastAPI(title="RAG API")
+
+# allow react and fastapi to communicate
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173","http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class AskRequest(BaseModel):
