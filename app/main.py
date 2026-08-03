@@ -22,7 +22,6 @@ ingester  = Ingester(processor, embedder)
 doc_mgr   = DocumentManager()
 llm       = LLMClient()
 
-app = FastAPI(title="RAG API")
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(title="RAG API")
