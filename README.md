@@ -25,7 +25,7 @@ Search is hybrid: vector similarity (pgvector) and Postgres full-text search run
 
 ## 🎥 Demo
 
-[![Watch the demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/0.jpg)](https://youtu.be/tpV_Xm-i8LE)
+[![Watch the demo](https://img.youtube.com/vi/tpV_Xm-i8LE/0.jpg)](https://youtu.be/tpV_Xm-i8LE)
 
 > Full walkthrough on YouTube
 
