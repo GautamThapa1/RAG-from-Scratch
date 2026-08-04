@@ -13,7 +13,7 @@ from app.embedder import Embedder
 from app.llm import LLMClient
 from app.processor import PDFProcessor
 from app.rag import DocumentManager, HybridSearch, Ingester
-
+from app.agent import Agent
 from fastapi.middleware.cors import CORSMiddleware
 
 embedder  = Embedder()
@@ -21,6 +21,7 @@ processor = PDFProcessor()
 ingester  = Ingester(processor, embedder)
 doc_mgr   = DocumentManager()
 llm       = LLMClient()
+agent     = Agent(llm, embedder)
 
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 
@@ -58,29 +59,39 @@ def upload_pdf(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
+    # chunk and create embeddings
     doc_id, num_chunks = ingester.ingest(file_path, file.filename)
     return {"document_id": doc_id, "chunks": num_chunks, "filename": file.filename}
 
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest):
     start  = time.time()
-    chunks = await asyncio.to_thread(HybridSearch(req.question, embedder, req.top_k).search, req.top_n)
-    answer = await asyncio.to_thread(llm.generate, req.question, chunks)
+    # chunks = await asyncio.to_thread(HybridSearch(req.question, embedder, req.top_k).search, req.top_n)
 
-    sources = [
-        {
-            "content":     c["content"][:300],
-            "score":       c.get("rerank_score", c.get("rrf_score")),
-            "document_id": c["document_id"],
-            "page_number": c["page_number"],
-        }
-        for c in chunks
-    ]
+    # # send embeddings to llm
+    # answer = await asyncio.to_thread(llm.generate, req.question, chunks)
+
+    # sources = [
+    #     {
+    #         "content":     c["content"][:300],
+    #         "score":       c.get("rerank_score", c.get("rrf_score")),
+    #         "document_id": c["document_id"],
+    #         "page_number": c["page_number"],
+    #     }
+    #     for c in chunks
+    # ]
+
+    result = await asyncio.to_thread(
+        agent.run,
+        req.question,
+        req.top_k,
+        req.top_n,
+    )
 
     return AskResponse(
         question=req.question,
-        answer=answer,
-        sources=sources,
+        answer=result.answer,
+        sources=result.sources,
         processing_time_ms=round((time.time() - start) * 1000, 1),
     )
 
