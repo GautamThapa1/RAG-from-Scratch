@@ -2,6 +2,8 @@ from llama_cpp import Llama
 
 from app.config import config
 
+###########
+
 SYSTEM_PROMPT = """
 You are a question-answering assistant.
 
@@ -16,6 +18,8 @@ Rules:
 - Keep answers clear and concise.
 """
 
+###########
+
 USER_PROMPT = """
 Retrieved Context:
 
@@ -26,6 +30,7 @@ Question:
 
 Answer using only the retrieved context:
 """
+
 
 
 class LLMClient:
@@ -53,3 +58,4 @@ class LLMClient:
             temperature=config.LLM_TEMP,
         )
         return response["choices"][0]["message"]["content"]
+

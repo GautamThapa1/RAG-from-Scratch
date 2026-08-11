@@ -70,7 +70,7 @@ class HybridSearch:
                 SELECT content, document_id, chunk_index, page_number,
                        1 - (embedding <=> %s::vector) AS score
                 FROM document_chunks
-                ORDER BY score ASC
+                ORDER BY score DESC
                 LIMIT %s
                 """,
                 (vec, self.top_k),

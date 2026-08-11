@@ -1,20 +1,19 @@
+import asyncio
 import os
 import shutil
 import time
-import asyncio
-from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app.agent import Agent
 from app.config import config
 from app.database import db
 from app.embedder import Embedder
 from app.llm import LLMClient
 from app.processor import PDFProcessor
-from app.rag import DocumentManager, HybridSearch, Ingester
-from app.agent import Agent
-from fastapi.middleware.cors import CORSMiddleware
+from app.rag import DocumentManager, Ingester
 
 embedder  = Embedder()
 processor = PDFProcessor()
@@ -39,8 +38,8 @@ app.add_middleware(
 
 class AskRequest(BaseModel):
     question: str
-    top_k: Optional[int] = config.TOP_K
-    top_n: Optional[int] = config.TOP_N
+    top_k: int | None = config.TOP_K
+    top_n: int | None = config.TOP_N
 
 
 class AskResponse(BaseModel):
@@ -55,32 +54,21 @@ def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
-    file_path = os.path.join(config.UPLOAD_DIR, file.filename)
+    safe_name = os.path.basename(file.filename)
+    file_path = os.path.join(config.UPLOAD_DIR, safe_name)
+
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # chunk and create embeddings
-    doc_id, num_chunks = ingester.ingest(file_path, file.filename)
-    return {"document_id": doc_id, "chunks": num_chunks, "filename": file.filename}
+    doc_id, num_chunks = ingester.ingest(file_path, safe_name)
+    return {"document_id": doc_id, "chunks": num_chunks, "filename": safe_name}
 
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest):
     start  = time.time()
-    # chunks = await asyncio.to_thread(HybridSearch(req.question, embedder, req.top_k).search, req.top_n)
 
-    # # send embeddings to llm
-    # answer = await asyncio.to_thread(llm.generate, req.question, chunks)
-
-    # sources = [
-    #     {
-    #         "content":     c["content"][:300],
-    #         "score":       c.get("rerank_score", c.get("rrf_score")),
-    #         "document_id": c["document_id"],
-    #         "page_number": c["page_number"],
-    #     }
-    #     for c in chunks
-    # ]
-
+    # runs agent.run in background, agent.run(question, top_k, top_n) 
+    # but in background
     result = await asyncio.to_thread(
         agent.run,
         req.question,
