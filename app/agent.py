@@ -28,8 +28,10 @@ class Agent:
             sources=[
                 {
                     "content": c["content"][:300],
+                    "full_content": c["content"],
                     "score": c.get("rerank_score", c.get("rrf_score")),
                     "document_id": c["document_id"],
+                    "chunk_index": c["chunk_index"],
                     "page_number": c["page_number"],
                 }
                 for c in chunks

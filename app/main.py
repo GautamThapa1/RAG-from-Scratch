@@ -11,6 +11,7 @@ from app.agent import Agent
 from app.config import config
 from app.database import db
 from app.embedder import Embedder
+from app.eval import run_eval, summarize
 from app.llm import LLMClient
 from app.processor import PDFProcessor
 from app.rag import DocumentManager, Ingester
@@ -47,6 +48,15 @@ class AskResponse(BaseModel):
     answer:             str
     sources:            list[dict]
     processing_time_ms: float
+
+class EvalRequest(BaseModel):
+    document_id: int
+    max_questions: int | None = 30
+
+
+class EvalResponse(BaseModel):
+    summary: dict
+    results: list[dict]
 
 
 @app.post("/upload")
@@ -115,3 +125,17 @@ def health():
         return {"status": "healthy", "documents": count}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
+
+@app.post("/eval", response_model=EvalResponse)
+async def eval_document(req: EvalRequest):
+    # confirm doc exists before burning Groq calls on an empty chunk set
+    docs = {d[0] for d in doc_mgr.list()}
+    if req.document_id not in docs:
+        raise HTTPException(status_code=404, detail=f"Document {req.document_id} not found")
+
+    results = await asyncio.to_thread(run_eval, req.document_id, agent, req.max_questions)
+
+    return EvalResponse(
+        summary=summarize(results),
+        results=[r.__dict__ for r in results],
+    )

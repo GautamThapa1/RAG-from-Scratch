@@ -1,4 +1,9 @@
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Config:
@@ -30,6 +35,8 @@ class Config:
     TOP_K = 15   # candidates per search leg
     RRF_K = 60
     TOP_N = 5    # final chunks sent to the LLM
+
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 
 config = Config()
