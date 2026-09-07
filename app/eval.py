@@ -13,8 +13,9 @@ from app.database import db
 GROQ_API_KEY = config.GROQ_API_KEY
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-GROQ_GEN_MODEL = "llama-3.1-8b-instant"
-GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
+GROQ_DEFAULT_MODEL = os.environ.get("GROQ_LLM_MODEL", "openai/gpt-oss-20b")
+GROQ_GEN_MODEL = os.environ.get("GROQ_EVAL_GEN_MODEL", GROQ_DEFAULT_MODEL)
+GROQ_JUDGE_MODEL = os.environ.get("GROQ_EVAL_JUDGE_MODEL", GROQ_DEFAULT_MODEL)
 
 def _groq_chat(model: str, system: str, user: str, temperature: float = 0.0) -> str:
     resp = requests.post(
