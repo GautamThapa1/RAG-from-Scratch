@@ -152,7 +152,7 @@ or manually:
 ```bash
 uv venv
 source .venv/bin/activate
-uv pip install -e .
+uv pip install -e ".[local-llm]"
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
