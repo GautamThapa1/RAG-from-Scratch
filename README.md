@@ -91,7 +91,7 @@ No LangChain, no LlamaIndex, no vector DB abstraction layer, no orchestration fr
 ### 1. Clone it
 
 ```bash
-git clone https://github.com/GautamThapa1/rag_system.git
+git clone https://github.com/GautamThapa1/RAG-from-Scratch.git
 cd rag_system
 ```
 
