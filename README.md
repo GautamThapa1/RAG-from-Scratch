@@ -1,24 +1,24 @@
-# 🦙 Local Hybrid RAG System (Llama 3.2 + PGVector)
+# 🦙 Hybrid RAG System (Local Llama, Groq + PGVector)
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 
-A fully local Retrieval-Augmented Generation app for asking questions over your own PDFs. No OpenAI key, no LangChain, no LlamaIndex — everything here is written from scratch in plain Python so I actually understand and control what's happening at every step of the pipeline.
+A Retrieval-Augmented Generation app for asking questions over your own PDFs. Answer generation can use the local Llama 3.2 model or Groq. No LangChain, no LlamaIndex — everything here is written from scratch in plain Python so I actually understand and control what's happening at every step of the pipeline.
 
-Search is hybrid: vector similarity (pgvector) and Postgres full-text search run side by side, get merged with Reciprocal Rank Fusion, then get re-scored by a cross-encoder before the top chunks ever reach the LLM. Generation happens locally with Llama 3.2 3B via `llama-cpp-python`.
+Search is hybrid: vector similarity (pgvector) and Postgres full-text search run side by side, get merged with Reciprocal Rank Fusion, then get re-scored by a cross-encoder before the top chunks reach the selected LLM.
 
 ---
 
 ## 📑 Table of Contents
-- [🎥 Demo](Demo)
+- [🎥 Demo](#-demo)
 - [🤔 Why no framework?](#-why-no-framework)
-- [⚙️ How it works](#%EF%B8%8F-how-it-works)
-- [🛠️ Stack](#%EF%B8%8F-stack)
+- [⚙️ How it works](#️-how-it-works)
+- [🛠️ Stack](#️-stack)
 - [🚀 Getting it running](#-getting-it-running)
 - [📡 API](#-api)
-- [🎛️ Tuning knobs](#%EF%B8%8F-tuning-knobs-appconfigpy)
+- [🎛️ Tuning knobs](#️-tuning-knobs-appconfigpy)
 - [📄 License](#-license)
 
 ---
@@ -44,7 +44,7 @@ I never used LangChain here — that was the point from day one. My goal wasn't 
 3. On a query, two searches run in parallel — cosine similarity over embeddings, and Postgres full-text search — each returning their own top-k.
 4. Results get merged with Reciprocal Rank Fusion, since raw scores from the two methods aren't directly comparable but rank position is.
 5. The merged candidates get reranked with a cross-encoder (`ms-marco-MiniLM-L-6-v2`) to squeeze out the ones that actually answer the question.
-6. Top N chunks get stuffed into a prompt and handed to a local Llama 3.2 3B GGUF model for the final answer, with page citations attached.
+6. Top N chunks get stuffed into a prompt and handed to either the local Llama 3.2 3B GGUF model or Groq for the final answer, with page citations attached.
 
 ```
 PDF → chunk (PyMuPDF) → embed (MiniLM) → Postgres (pgvector + tsvector)
@@ -59,8 +59,8 @@ PDF → chunk (PyMuPDF) → embed (MiniLM) → Postgres (pgvector + tsvector)
                                      Reciprocal Rank Fusion
                                               │
                                   cross-encoder rerank (top-n)
-                                              │
-                                   Llama 3.2 3B (local, GGUF)
+                                                │
+                                    Local Llama 3.2 or Groq
                                               │
                                         React frontend
 ```
@@ -69,7 +69,7 @@ PDF → chunk (PyMuPDF) → embed (MiniLM) → Postgres (pgvector + tsvector)
 
 ## 🛠️ Stack
 
-**Backend** — FastAPI, Postgres + pgvector, `sentence-transformers` (embedding + reranking), `llama-cpp-python`, PyMuPDF for extraction.
+**Backend** — FastAPI, Postgres + pgvector, `sentence-transformers` (embedding + reranking), `llama-cpp-python` for local generation, Groq API support, and PyMuPDF for extraction.
 
 **Frontend** — React 19 + Vite, Axios, plain CSS (no component library — didn't need one for this).
 
@@ -82,9 +82,11 @@ No LangChain, no LlamaIndex, no vector DB abstraction layer, no orchestration fr
 ### 📋 You'll need
 
 - Python 3.12+
-- `uv` (or plain pip) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Node 18+
-- Postgres with the `pgvector` extension available
+- Either Docker and Docker Compose, or a local Postgres instance with the `pgvector` extension
+
+> **Note:** Docker only runs the Groq-backed configuration — `compose.yaml` forces `LLM_PROVIDER=groq` regardless of `.env`. Use the manual `make dev` setup (step 3) if you want to run the local Llama model.
 
 ### 1. Clone it
 
@@ -93,7 +95,78 @@ git clone https://github.com/GautamThapa1/rag_system.git
 cd rag_system
 ```
 
-### 2. Set up the database
+### 2. Configure environment variables
+
+Copy the tracked environment template, then edit `.env` with your database credentials and, when needed, your Groq API key. Never commit a real API key.
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+DB_NAME=rag_db
+DB_USER=postgres
+DB_PASSWORD=rag_password_123
+DB_HOST=localhost
+
+# Choose "local" or "groq" when running with make dev.
+LLM_PROVIDER=local
+
+# Required only when LLM_PROVIDER=groq or when using Docker.
+GROQ_API_KEY=your_groq_api_key
+# Optional; defaults to openai/gpt-oss-20b.
+GROQ_LLM_MODEL=openai/gpt-oss-20b
+```
+
+Get a Groq API key from [Groq Console](https://console.groq.com/keys). If you use `LLM_PROVIDER=local`, the key is not used.
+
+### 3. Run locally with `make dev` (no Docker)
+
+Docker is optional. To run the local model without Docker, install Postgres with the `pgvector` extension and complete the manual database setup in step 4 before running `make dev`. The provider is read from `.env`, so you can use either local Llama or Groq.
+
+#### Local Llama model
+
+Set:
+
+```dotenv
+LLM_PROVIDER=local
+```
+
+Install the local LLM dependency and download the GGUF model:
+
+```bash
+make sync
+mkdir -p models
+```
+
+Download `Llama-3.2-3B-Instruct-Q6_K.gguf` from [bartowski's GGUF repo on HuggingFace](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF) and place it in `models/`. Then start the API:
+
+```bash
+make dev
+```
+
+#### Groq model
+
+Set these values instead:
+
+```dotenv
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key
+GROQ_LLM_MODEL=openai/gpt-oss-20b
+```
+
+Then start the API. `make sync` is still required for the other Python dependencies, but the local GGUF model is not required when using Groq:
+
+```bash
+make sync
+make dev
+```
+
+The local API runs at `http://localhost:8000`.
+
+### 4. Set up the database manually (for non-Docker runs)
+
+Use this step when running the API with `make dev`. Docker users can skip it because Compose starts and initializes the pgvector database automatically.
 
 ```bash
 sudo -u postgres psql -c "CREATE DATABASE rag_db;"
@@ -130,35 +203,29 @@ CREATE INDEX IF NOT EXISTS idx_document_chunks_tsv ON document_chunks USING gin 
 "
 ```
 
-Credentials are configurable in `app/config.py` if you don't want to use the defaults above.
+Credentials are configured in `.env`.
 
-### 3. Grab the model
+### 5. Run with Docker (optional, Groq only)
 
-```bash
-mkdir -p models
-```
+Docker starts both the pgvector database and the API server. The Docker server always uses Groq, even if `.env` contains `LLM_PROVIDER=local`, because `compose.yaml` overrides it with `LLM_PROVIDER=groq`.
 
-Download `Llama-3.2-3B-Instruct-Q6_K.gguf` from [bartowski's GGUF repo on HuggingFace](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF) and drop it in `models/`.
-
-### 4. Run the backend
+Set a valid `GROQ_API_KEY` in `.env`, then run:
 
 ```bash
-make sync
-make dev
+docker compose up --build
 ```
 
-or manually:
+The API runs at `http://localhost:8000`. Stop the services with:
 
 ```bash
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[local-llm]"
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+docker compose down
 ```
 
-Runs at `http://localhost:8000`.
+The local GGUF model is not used or required by the Docker deployment.
 
-### 5. Run the frontend
+### 6. Run the frontend
+
+The frontend expects the backend at `http://localhost:8000` (see [frontend/rag-app/src/services/api.js](frontend/rag-app/src/services/api.js) — update this if your API runs elsewhere).
 
 ```bash
 make react
@@ -188,6 +255,46 @@ Swagger docs live at `http://localhost:8000/docs` once the backend is up. Quick 
 | `/documents/{id}` | DELETE | Remove one document and its chunks |
 | `/documents` | DELETE | Wipe everything |
 | `/health` | GET | Health check + document count |
+| `/eval` | POST | Evaluate a document's RAG answers |
+
+### Evaluation pipeline
+
+The `/eval` endpoint evaluates the quality of answers generated from one indexed document. It:
+
+1. Generates up to one natural-language question for each sampled document chunk, so `max_questions=20` can produce up to 20 questions rather than only one total.
+2. Runs each question through the normal retrieval and answer-generation pipeline.
+3. Uses a Groq model to score answer faithfulness and relevancy.
+4. Checks whether retrieval found the source chunk used to generate each question.
+5. Reports aggregate scores, context recall, and average latency.
+
+Run an evaluation with:
+
+```bash
+curl -X POST http://localhost:8000/eval \
+    -H "Content-Type: application/json" \
+    -d '{"document_id": 1, "max_questions": 20}'
+```
+
+`document_id` is required and must refer to an uploaded document. `max_questions` is optional and limits the number of sampled chunks; it defaults to 30. Chunks shorter than 40 characters and questions whose generated response is not valid JSON are skipped, so the final number of evaluation questions can be lower than this limit.
+
+Evaluation requires `GROQ_API_KEY`, even if the normal `/ask` endpoint is configured to use the local Llama model. By default, evaluation uses the `GROQ_LLM_MODEL` configured in `.env` to generate questions and judge faithfulness and relevancy, so it can make several API calls per question. You can override the evaluation models with `GROQ_EVAL_GEN_MODEL` and `GROQ_EVAL_JUDGE_MODEL`.
+
+The response contains a `summary` and detailed per-question `results`:
+
+```json
+{
+    "summary": {
+        "n_questions": 20,
+        "faithfulness_avg": 0.9,
+        "relevancy_avg": 0.95,
+        "context_recall": 0.85,
+        "avg_latency_ms": 742.3
+    },
+    "results": []
+}
+```
+
+Each result includes the generated `question`, answer, faithfulness and relevancy scores with reasons, whether the source chunk was retrieved (`context_hit`), the number of sources, and request latency.
 
 ---
 
