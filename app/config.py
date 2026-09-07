@@ -8,10 +8,10 @@ load_dotenv()
 
 class Config:
     # database
-    DB_NAME     = "rag_db"
-    DB_USER     = "postgres"
-    DB_PASSWORD = "rag_password_123"
-    DB_HOST     = "localhost"
+    DB_NAME     = os.getenv("DB_NAME", "rag_db")
+    DB_USER     = os.getenv("DB_USER", "postgres")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+    DB_HOST     = os.getenv("DB_HOST", "localhost")
 
     # uploads
     UPLOAD_DIR = "uploads"
@@ -36,6 +36,8 @@ class Config:
     RRF_K = 60
     TOP_N = 5    # final chunks sent to the LLM
 
+    # llm provider switch: "local" (llama_cpp) or "groq" (hosted, for Render)
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "local")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 

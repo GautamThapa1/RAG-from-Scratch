@@ -116,7 +116,7 @@ def judge_relevancy(question: str, answer: str) -> dict:
     user = f"Question: {question}\n\nAnswer: {answer}"
     return _parse_json(_groq_chat(GROQ_JUDGE_MODEL, RELEVANCY_SYSTEM, user))
 
-
+# Context
 def _chunk_in_sources(source_document_id: int, source_chunk_index: int, sources: list[dict]) -> bool:
     return any(
         s.get("document_id") == source_document_id and s.get("chunk_index") == source_chunk_index
@@ -201,13 +201,18 @@ def print_report(results: list[EvalResult]):
 
 if __name__ == "__main__":
     from app.embedder import Embedder
-    from app.llm import LLMClient
+
+    if config.LLM_PROVIDER == "groq":
+        from app.llm_groq import GroqLLMClient
+        llm = GroqLLMClient()
+    else:
+        from app.llm import LLMClient
+        llm = LLMClient()
 
     DOC_ID = int(os.environ.get("EVAL_DOC_ID", "1"))
 
-    llm     = LLMClient()
     embedder = Embedder()
-    agent   = Agent(llm, embedder)
+    agent    = Agent(llm, embedder)
 
     results = run_eval(DOC_ID, agent, max_questions=20)
     print_report(results)

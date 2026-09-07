@@ -12,25 +12,35 @@ from app.config import config
 from app.database import db
 from app.embedder import Embedder
 from app.eval import run_eval, summarize
-from app.llm import LLMClient
 from app.processor import PDFProcessor
 from app.rag import DocumentManager, Ingester
 
+if config.LLM_PROVIDER == "groq":
+    from app.llm_groq import GroqLLMClient
+    llm = GroqLLMClient()
+else:
+    try:
+        from app.llm import LLMClient
+        llm = LLMClient()
+    except ImportError:
+        raise RuntimeError(
+            "LLM_PROVIDER=local requires llama-cpp-python. "
+            "Install it with: uv sync --extra local-llm"
+        )
+    
 embedder  = Embedder()
 processor = PDFProcessor()
 ingester  = Ingester(processor, embedder)
 doc_mgr   = DocumentManager()
-llm       = LLMClient()
 agent     = Agent(llm, embedder)
 
 os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(title="RAG API")
 
-# allow react and fastapi to communicate
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173","http://localhost:8000"],
+    allow_origins=["http://localhost:5173", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
