@@ -6,7 +6,7 @@ from app.prompts import SYSTEM_PROMPT, USER_PROMPT
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL   = os.environ.get("GROQ_LLM_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL   = os.environ.get("GROQ_LLM_MODEL", "openai/gpt-oss-20b")
 
 
 class GroqLLMClient:
@@ -31,5 +31,8 @@ class GroqLLMClient:
             },
             timeout=30,
         )
-        resp.raise_for_status()
+        if not resp.ok:
+            raise RuntimeError(
+                f"Groq API request failed ({resp.status_code}): {resp.text[:500]}"
+            )
         return resp.json()["choices"][0]["message"]["content"]

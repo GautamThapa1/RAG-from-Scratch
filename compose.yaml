@@ -28,6 +28,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - LLM_PROVIDER=groq
+      - GROQ_LLM_MODEL=${GROQ_LLM_MODEL:-openai/gpt-oss-20b}
     ports:
       - "8000:8000"
     volumes:
