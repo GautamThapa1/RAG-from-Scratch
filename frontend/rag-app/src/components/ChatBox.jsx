@@ -1,27 +1,27 @@
 import { useState } from "react";
 import { askQuestion } from "../services/api";
-import Message from "./Message";
-
 function ChatBox({ messages, setMessages }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSend = async () => {
-    if (!input.trim()) return; // prevents empty messages
+    const question = input.trim();
+    if (!question) return; // prevents empty messages
 
     const userMessage = {
       role: "user",
-      text: input,
+      text: question,
     };
     
     // collect then and append new messages in an array         
     setMessages((prev) => [...prev, userMessage]);
+    setInput("");
 
     setLoading(true);
 
     // make the call
     try {
-      const data = await askQuestion(input);
+      const data = await askQuestion(question);
 
       const botMessage = {
         role: "assistant",
@@ -34,8 +34,6 @@ function ChatBox({ messages, setMessages }) {
       console.log(error);
     }
 
-    // reset
-    setInput("");
     setLoading(false);
   };
 

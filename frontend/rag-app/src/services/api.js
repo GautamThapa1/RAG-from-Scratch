@@ -1,10 +1,11 @@
 import axios from "axios";
 
+const API_BASE_URL = "http://localhost:8000";
 
 // custom instance to reduce writing the whole url for 
 // every request
 const API = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: API_BASE_URL,
 });
 
 export const askQuestion = async (question) => {
