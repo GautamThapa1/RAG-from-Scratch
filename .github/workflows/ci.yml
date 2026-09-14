@@ -18,6 +18,8 @@ jobs:
     name: Backend tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      LLM_PROVIDER: groq
 
     steps:
       - name: Check out repository
