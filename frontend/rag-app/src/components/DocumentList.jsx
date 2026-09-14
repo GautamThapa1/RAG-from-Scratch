@@ -18,7 +18,11 @@ function DocumentList({ refreshKey }) {
   };
 
   useEffect(() => {
-    fetchDocuments();
+    const loadDocuments = async () => {
+      await fetchDocuments();
+    };
+
+    loadDocuments();
   }, [refreshKey]);
 
   const toggleSelect = (id) => {
